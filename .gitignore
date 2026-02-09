@@ -1,0 +1,13 @@
+# Logs and Reports
+scan_report_*.txt
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.env
+
+# OS
+.DS_Store
+Thumbs.db
