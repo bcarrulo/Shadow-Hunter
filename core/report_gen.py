@@ -16,9 +16,30 @@ def generate_markdown_report(target, workspace_dir, open_ports):
         f.write(f"# 🎯 Shadow Hunter Report: `{target}`\n")
         f.write(f"**Data do Scan:** {now}\n")
         f.write("---\n\n")
+
+        # Secção 0: Subdomínios (Apenas Se Domain Enum correu)
+        sub_alive_file = os.path.join(workspace_dir, "subdomains_alive.txt")
+        sub_all_file = os.path.join(workspace_dir, "subdomains_all.txt")
+        if os.path.exists(sub_alive_file) or os.path.exists(sub_all_file):
+            f.write("## 0. 🌍 Enumeração de Subdomínios\n\n")
+            if os.path.exists(sub_alive_file):
+                with open(sub_alive_file, 'r') as sf:
+                    subs = sf.readlines()
+                f.write(f"**Subdomínios VIVOS ({len(subs)}):**\n```text\n")
+                f.writelines(subs[:50])
+                if len(subs) > 50: f.write("... (truncado)\n")
+                f.write("```\n\n")
+            elif os.path.exists(sub_all_file):
+                with open(sub_all_file, 'r') as sf:
+                    subs = sf.readlines()
+                f.write(f"**Subdomínios Apanhados (Sem confirmação de vida) ({len(subs)}):**\n```text\n")
+                f.writelines(subs[:50])
+                if len(subs) > 50: f.write("... (truncado)\n")
+                f.write("```\n\n")
+            f.write("---\n\n")
         
         # Secção 1: Portas Abertas (Tabela)
-        f.write("## 1. 🌐 Superfície de Ataque (Network Enum)\n\n")
+        f.write("## 1. 🚪 Superfície de Ataque (Network Enum)\n\n")
         if open_ports:
             f.write("| Porta | Serviço & Versão |\n")
             f.write("|-------|-----------------|\n")
@@ -30,50 +51,65 @@ def generate_markdown_report(target, workspace_dir, open_ports):
         f.write("\n---\n\n")
 
         # Secção 2: Web Enum
-        f.write("## 2. 🕸️ Mapeamento Web (Web Enum)\n")
-        web_files = [f for f in os.listdir(workspace_dir) if f.startswith("web_enum") and f.endswith(".txt")]
+        f.write("## 2. 🕸️ Mapeamento Web\n")
+        web_files = [x for x in os.listdir(workspace_dir) if x.startswith("web_") and x.endswith(".txt")]
         if web_files:
             for web_file in web_files:
-                f.write(f"### Descobertas em `{web_file}`\n")
+                f.write(f"### Descobertas em `{web_file}` (Feroxbuster, Nuclei, WPScan, Nmap)\n")
                 f.write("```text\n")
                 with open(os.path.join(workspace_dir, web_file), 'r', errors='ignore') as wf:
-                    # Lê só as primeiras 30 linhas para não inundar o report
-                    lines = wf.readlines()[:30]
+                    lines = wf.readlines()[:50]
                     f.writelines(lines)
-                if len(lines) == 30: f.write("... (Resultados truncados, ver ficheiro original) ...\n")
+                if len(lines) == 50: f.write("\n... (Resultados truncados, ver ficheiro original) ...\n")
                 f.write("```\n\n")
         else:
             f.write("*Sem enumeração web registada.*\n\n")
 
-        # Secção 3: Enumeração de Serviços (SMB, FTP, etc)
-        f.write("## 3. ⚙️ Serviços Específicos (SMB, FTP, DNS, SNMP)\n")
+        # Secção 3: Enumeração de Serviços
+        f.write("---\n\n## 3. ⚙️ Ferramentas de Infraestrutura (SMB, AD, DNS, etc)\n")
         
-        # Pega em todos os txts de serviços e infra que não sejam web nem o do searchsploit ou o do nmap global
-        serv_files = [x for x in os.listdir(workspace_dir) if x.endswith(".txt") and ("smb" in x or "ftp" in x or "dns" in x or "snmp" in x)]
+        serv_files = [x for x in os.listdir(workspace_dir) if x.endswith(".txt") and any(k in x for k in ["smb_", "ftp_", "dns_", "snmp_"])]
         if serv_files:
+            f.write("Resultados de ferramentas como NetExec, SMBMap, Enum4linux e axfr:\n\n")
             for s_file in serv_files:
-                f.write(f"### Serviço: `{s_file}`\n")
+                f.write(f"### `{s_file}`\n")
                 f.write("```text\n")
                 with open(os.path.join(workspace_dir, s_file), 'r', errors='ignore') as sf:
-                    # Traz as primeiras 50 linhas para não entupir
-                    f.writelines(sf.readlines()[:50])
+                    lines = sf.readlines()[:50]
+                    f.writelines(lines)
+                if len(lines) == 50: f.write("\n... (Resultados truncados, ver original) ...\n")
                 f.write("```\n\n")
         else:
-            f.write("*Sem leaks de serviços específicos encontrados.* 🔒\n\n")
+            f.write("*Sem leaks de serviços específicos encontrados.*\n\n")
 
         # Secção 4: Exploits Guardados
-        f.write("---\n\n")
-        f.write("## 4. 🗡️ Auto-Exploit e CVEs Sugeridos\n")
+        f.write("---\n\n## 4. 🗡️ Ofensiva e Credenciais\n")
+        
+        # Hydra e Cracking
+        brute_files = [x for x in os.listdir(workspace_dir) if (x.startswith("hydra_") or x.startswith("cracked_")) and x.endswith(".txt")]
+        if brute_files:
+            f.write("### 🔑 Credenciais (Brute-Force & Hashes)\n\n")
+            for b_file in brute_files:
+                f.write(f"#### Origem: `{b_file}`\n")
+                f.write("```text\n")
+                with open(os.path.join(workspace_dir, b_file), 'r', errors='ignore') as bf:
+                    lines = bf.readlines()
+                    f.writelines(lines[:50])
+                if len(lines) > 50: f.write("\n... (truncado)\n")
+                f.write("```\n\n")
+
+        # Searchsploit
         exp_file = os.path.join(workspace_dir, "searchsploit_findings.txt")
         if os.path.exists(exp_file):
-            f.write("A ferramenta tentou mapear as versões detetadas contra a base de dados de Exploits locais:\n\n")
+            f.write("### 📜 CVEs Potenciais e Exploits Encontrados\n\n")
             f.write("```text\n")
             with open(exp_file, 'r', errors='ignore') as ef:
-                # Limite de 100 linhas no MD
-                f.writelines(ef.readlines()[:100])
+                lines = ef.readlines()
+                f.writelines(lines[:100])
+            if len(lines) > 100: f.write("\n... (truncado)\n")
             f.write("```\n\n")
-        else:
-            f.write("*O Searchsploit não detetou CVEs óbvios para as versões dadas.*\n\n")
+        elif not brute_files and not os.path.exists(exp_file):
+            f.write("*Sem vetor ofensivo direto automatizado apanhado nesta run.*\n\n")
 
         # Footer
         f.write("---\n")

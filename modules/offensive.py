@@ -1,7 +1,53 @@
 import os
 import subprocess
 import shutil
+import tempfile
 from core.utils import G, R, Y, B, W, log_print
+
+def run_hydra_brute(target, port, service, workspace_dir):
+    """
+    Kicks off a quick Hydra bruteforce against SSH or FTP using common small wordlists.
+    This acts on the "low hanging fruit" method.
+    """
+    log_print(f"\n{R}[*] (AUTO-MODE) A Iniciar Hydra Brute-Force Ligeiro em {service.upper()} ({port})...{W}")
+    if not shutil.which("hydra"):
+        log_print(f"{Y}[!] Hydra não instalado. Saltando brute-force...{W}")
+        return
+
+    out_file = os.path.join(workspace_dir, f"hydra_{service}_{port}.txt")
+    
+    # Criamos ficheiros temporários para login/passwords para não precisar de ficheiros grandes externos
+    # (Ou podíamos usar o /usr/share/wordlists, mas isto torna a tool portátil)
+    default_users = "root\nadmin\nuser\nguest\npostgres\noracle\nubuntu\nadministrator\n"
+    default_pass = "root\nadmin\nguest\n123456\npassword\ntoortoor\npassword123\n"
+    
+    users_file = os.path.join(workspace_dir, "temp_users.txt")
+    pass_file = os.path.join(workspace_dir, "temp_pass.txt")
+    
+    with open(users_file, "w") as uf: uf.write(default_users)
+    with open(pass_file, "w") as pf: pf.write(default_pass)
+
+    try:
+        # hydra -L temp_users.txt -P temp_pass.txt ftp://192.168.1.5 -s 21 -o result.txt -t 4
+        cmd = ["hydra", "-L", users_file, "-P", pass_file, "-s", str(port), "-vV", "-t", "4", "-I", f"{service}://{target}"]
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        
+        with open(out_file, "w") as f:
+            f.write(res.stdout)
+            
+        if "login:" in res.stdout and "password:" in res.stdout:
+            log_print(f"{G}[!!!] SUCESSO HYDRA: Credenciais encontradas! Ver relatório.{W}")
+        else:
+            log_print(f"[-] Nenhuma credencial básica funcionou em {service}.")
+            
+    except Exception as e:
+        log_print(f"{R}[!] Erro do Hydra: {e}{W}")
+        
+    finally:
+        # Cleanup dos ficheiros temporários
+        if os.path.exists(users_file): os.remove(users_file)
+        if os.path.exists(pass_file): os.remove(pass_file)
+
 
 def run_searchsploit(target, open_ports, workspace_dir):
     """

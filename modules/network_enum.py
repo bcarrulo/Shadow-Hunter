@@ -24,9 +24,11 @@ def run_network_scan(target, profile, workspace_dir):
     log_print(f"{Y}[>] A executar: {' '.join(cmd)}{W}")
     
     try:
-        # Usa subprocess para o utilizador ver em tempo real e guardarmos os ficheiros grepables
-        subprocess.run(cmd, check=True)
+        # Fazer timeout de emergência de 35 minutos caso alguma script vulnere o bloqueie
+        subprocess.run(cmd, check=True, timeout=2100)
         log_print(f"{G}[+] Resultados Nmap guardados em: {nmap_out_base}.nmap / .xml / .gnmap{W}")
+    except subprocess.TimeoutExpired:
+        log_print(f"{R}[!] Nmap ultrapassou o limite de tempo estrito (35 minutos) e foi cancelado.{W}")
     except subprocess.CalledProcessError as e:
         log_print(f"{R}[!] Erro ao executar ferramenta de scan: {e}{W}")
     except KeyboardInterrupt:

@@ -5,19 +5,43 @@ from core.utils import G, R, Y, B, W, log_print
 
 def run_dns_enum(target, workspace_dir):
     """
-    Tenta Zone Transfer e outras queries DNS.
+    Tenta Zone Transfer e queries DNS, usando preferencialmente dns.resolver puro (dnspython), 
+    se não instalado, faz fallback seguro para o bash (dig).
     """
-    log_print(f"\n{B}[*] (AUTO-MODE) Entrada DNS Detetada (Porta 53). A testar axfr...{W}")
+    log_print(f"\n{B}[*] (AUTO-MODE) Entrada DNS Detetada (Porta 53). A tentar Axis/Enumeração...{W}")
     out_file = os.path.join(workspace_dir, "dns_enum.txt")
 
-    if shutil.which("dig"):
-        try:
-            # AXFR contra si próprio com nome dummy, em CTFs às vezes passa
-            log_print(f"{Y}[>] Tentativa de Zone Transfer com 'dig'...{W}")
-            res = subprocess.run(["dig", "axfr", f"@{target}"], capture_output=True, text=True)
-            with open(out_file, 'w') as f: f.write(res.stdout)
-        except Exception as e:
-            log_print(f"{R}[!] Erro de DNS Enum: {e}{W}")
+    try:
+        import dns.zone
+        import dns.resolver
+        import dns.query
+        
+        log_print(f"{Y}[>] A iniciar AXFR Zone Transfer via native python (dnspython)...{W}")
+        with open(out_file, 'w') as f:
+            f.write("=== [NATIVE DNS ENUM] ===\n")
+            try:
+                # Se tu tiveres o domínio alvo podes tentar a query, assumindo que target pode ser nome
+                # Tenta pedir o registo NS se der
+                ns_answers = dns.resolver.resolve(target, 'NS')
+                for server in ns_answers:
+                     f.write(f"NS Encontrado: {server.target}\n")
+                     # Tentativa Zone Transfer
+                     z = dns.zone.from_xfr(dns.query.xfr(str(server.target), target))
+                     names = z.nodes.keys()
+                     for n in names:
+                          f.write(f"Subdomínio: {z[n].to_text(n)}\n")
+                log_print(f"{G}[+] Native AXFR efetuado. {W}")
+            except Exception as e:
+                f.write(f"Sem resposta limpa de AXFR: {e}\n")
+                
+    except ImportError:
+        # Fallback caso a biblioteca dnspython falhe ou falte
+        log_print(f"{R}[-] dnspython não instalada. A alternar para dig (fallback bash)...{W}")
+        if shutil.which("dig"):
+            try:
+                res = subprocess.run(["dig", "axfr", f"@{target}"], capture_output=True, text=True)
+                with open(out_file, 'w') as f: f.write(res.stdout)
+            except Exception as e: log_print(f"{R}[!] Erro de dig: {e}{W}")
 
 def run_snmp_enum(target, workspace_dir):
     """

@@ -30,7 +30,26 @@ echo -e "${BLUE}[+] Atualizando repositórios base...${RESET}"
 apt-get update -y > /dev/null
 
 echo -e "${BLUE}[+] Instalando pacotes e ferramentas de sistema...${RESET}"
-apt-get install -y nmap whatweb enum4linux dnsutils snmp util-linux python3 python3-pip wget curl git > /dev/null
+apt-get install -y nmap whatweb wpscan nikto enum4linux dnsutils snmp util-linux python3 python3-pip wget curl git sqlmap john hydra smbmap netexec python3-dnspython python3-requests subfinder > /dev/null
+
+# Tentar instalar httpx (Kali) ou httpx-toolkit dependendo do nome do repositorio
+if ! command -v httpx &> /dev/null && ! command -v httpx-toolkit &> /dev/null; then
+    echo -e "${BLUE}[+] Instalando HTTPX Toolkit para sondagem de domínios...${RESET}"
+    apt-get install -y httpx-toolkit > /dev/null || apt-get install -y httpx > /dev/null || echo -e "${RED}[-] Resolução de domínios lenta será usada como fallback.${RESET}"
+fi
+
+# Instalando Feroxbuster (Web Directory Fuzzer)
+if ! command -v feroxbuster &> /dev/null; then
+    echo -e "${BLUE}[+] Instalando Feroxbuster (A substituir FFUF)...${RESET}"
+    apt-get install -y feroxbuster > /dev/null
+    if [ $? -ne 0 ]; then
+        echo -e "${BLUE}[+] Instalando via script Rust (Kali Repository fallback)...${RESET}"
+        curl -sL https://raw.githubusercontent.com/epi052/feroxbuster/main/install-nix.sh | bash > /dev/null 2>&1
+        mv feroxbuster /usr/local/bin/ 2>/dev/null
+    fi
+else
+    echo -e "${GREEN}[+] Feroxbuster já está instalado.${RESET}"
+fi
 
 # Instalando FFUF (Caso não esteja nos repos da distro)
 if ! command -v ffuf &> /dev/null; then
